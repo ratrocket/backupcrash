@@ -2,4 +2,4 @@ all: clean
 	go build
 
 clean:
-	rm -rf database.db* backup.db*
+	rm -rf database.db* backup?.db*

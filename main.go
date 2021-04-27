@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	DBNAME = "database.db"
-	BACKUP = "backup.db"
+	DBNAME  = "database.db"
+	BACKUP1 = "backup1.db"
+	BACKUP2 = "backup2.db"
 
 	createTable = `CREATE TABLE products(
 		id    INTEGER PRIMARY KEY,
@@ -39,27 +40,31 @@ func main() {
 	fmt.Println("src products count (should be 2):", selectCountStar(srcconn, "products"))
 
 	// WAY ONE
-	_, err = srcconn.BackupToDB(DBNAME, BACKUP)
+	_, err = srcconn.BackupToDB(DBNAME, BACKUP1)
 	if err != nil {
+		log.Print("Way one failure")
 		log.Fatal(err)
 	}
 
 	// WAY TWO
-	dstpool, err := sqlitex.Open(BACKUP, 0, 10)
+	dstpool, err := sqlitex.Open(BACKUP2, 0, 10)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer dstpool.Close()
 	dstconn := dstpool.Get(nil)
 	defer dstpool.Put(dstconn)
-	bu, err := srcconn.BackupInit(DBNAME, BACKUP, dstconn)
+	bu, err := srcconn.BackupInit(DBNAME, BACKUP2, dstconn)
 	if err != nil {
+		log.Print("Way two, failure 1 (BackupInit)")
 		log.Fatal(err)
 	}
 	if err := bu.Step(-1); err != nil {
+		log.Print("Way two, failure 2 (Step)")
 		log.Fatal(err)
 	}
 	if err := bu.Finish(); err != nil {
+		log.Print("Way two, failure 3 (Finish)")
 		log.Fatal(err)
 	}
 
@@ -67,8 +72,11 @@ func main() {
 	insertProduct(srcconn, "OR", "Orange T")
 
 	fmt.Println("src products count (should be 3):", selectCountStar(srcconn, "products"))
-	fmt.Println("src products count (should be 2):", selectCountStar(dstconn, "products"))
+	fmt.Println("dst products count (should be 2):", selectCountStar(dstconn, "products"))
+	// don't have a convenient conn to check backup2.db...
 }
+
+// These functions fail on error for simplicity.
 
 func insertProduct(conn *sqlite.Conn, sku, title string) {
 	stmtTxt := "INSERT INTO products(sku, title) VALUES (?, ?)"
