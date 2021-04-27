@@ -4,4 +4,5 @@
 /misc
 /database.db*
 /backup.db*
+/backup?.db*
 /backupcrash
