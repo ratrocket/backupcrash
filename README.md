@@ -1,13 +1,17 @@
 # backupcrash
 
+**UPDATE**: The way around all this is to use sqlite's built in `VACUUM
+INTO` feature.  See my own sqlutil library for the 2 line backup
+implementation...
+
 Illustrates a crash I'm getting using the backup features of
-crawshaw.io/sqlite and crawshaw.io/sqlitex.
+[crawshaw.io/sqlite](https://github.com/crawshaw/sqlite) (and
+crawshaw.io/sqlitex).
 
 This is supposed to be a "minimal example" (I hope, haha!).
 
-My use case where I ran into this situation is in a command line tool
-that backs up the sqlite database before making some changes to its
-structure.
+I ran into the situation described here in a command line tool that
+backs up an sqlite database before making some changes to its structure.
 
 ## Environment
 
@@ -31,7 +35,7 @@ Clean & build: `make` (does `make clean` and `go build`)
 
 Run: `./backupcrash` (creates database files in project root)
 
-Clean up database files "manually": `make clean`
+Clean up database files "manually" if you need to with `make clean`
 
 To exercise the "way #2" backup method (see next section for what this
 even means...), edit the file and comment out the 4 lines that comprise
@@ -41,16 +45,18 @@ even means...), edit the file and comment out the 4 lines that comprise
 
 The program creates a database ("database.db") with a very minimal
 "products" table, inserts two phony products, then attempts to back up
-the database in two different ways to two distinct files.  After the
-backups, it inserts another product and checks that the primary database
-has 3 products and the first backup has 2 products.
+the database in two different ways to two distinct files ("backup1.db",
+"backup2.db").  After the backups, it would insert another product and
+check that the primary database has 3 products and the first backup has
+2 products.  "After the backups" is never attained, however -- that's
+the problem :).
 
 Way #1 uses
 [BackupToDB](https://pkg.go.dev/crawshaw.io/sqlite#Conn.BackupToDB)
 which looks to me like the easy, one-stop-shop method of back up.
 
 Way #2 uses the building blocks in package sqlite that BackupToDB itself
-uses.  ([Source of BackupToDB for
+uses: `BackupInit`, `Step`, `Finish`.  ([Source of BackupToDB for
 reference](https://github.com/crawshaw/sqlite/blob/v0.3.2/backup.go#L46).)
 
 ## Questions
@@ -79,6 +85,11 @@ deferred function `setCDB` is called, from [backup.go, line
 rest (the return on line 77 which kicks off the deferred function call
 that triggers the panic) is just the aftermath.
 
+So the problem is really [backup.go, line
+74](https://github.com/crawshaw/sqlite/blob/v0.3.2/backup.go#L74) where
+the call `C.sqlite3_backup_init(dst.conn, dstCDB, src.conn, srcCDB)`
+returns nil (and shouldn't).
+
 #### Note on mac OS
 
 I was able to run the program on a mac with an outdated go version.  The
@@ -92,7 +103,7 @@ pointer being freed was not allocated
 (This is different from on linux, where each way has a _slightly_
 different message...)
 
-The go version used on mac is
+The go version used on the mac is (very outdated, I know...)
 
 ```
 $ go version

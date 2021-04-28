@@ -20,6 +20,18 @@ const (
 	)`
 )
 
+// This is reimplimented as sqlutil.BackupTo.
+//
+// THIS is the solution to the crash illustrated by the commented out
+// parts of this program and the extensive write up in README.md.
+func backupVacuum(conn *sqlite.Conn, backup string) (err error) {
+	stmtTxt := "VACUUM INTO ?"
+	if err := sqlitex.Exec(conn, stmtTxt, nil, backup); err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	srcpool, err := sqlitex.Open(DBNAME, 0, 10)
 	if err != nil {
@@ -39,40 +51,46 @@ func main() {
 	// Make sure there are 2 products.
 	fmt.Println("src products count (should be 2):", selectCountStar(srcconn, "products"))
 
-	// WAY ONE
-	_, err = srcconn.BackupToDB(DBNAME, BACKUP1)
-	if err != nil {
-		log.Print("Way one failure")
+	// WAY ZERO
+	if err := backupVacuum(srcconn, BACKUP2); err != nil {
+		log.Print("Way zero failure")
 		log.Fatal(err)
 	}
 
+	// WAY ONE
+	// _, err = srcconn.BackupToDB(DBNAME, BACKUP1)
+	// if err != nil {
+	// 	log.Print("Way one failure")
+	// 	log.Fatal(err)
+	// }
+
 	// WAY TWO
-	dstpool, err := sqlitex.Open(BACKUP2, 0, 10)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer dstpool.Close()
-	dstconn := dstpool.Get(nil)
-	defer dstpool.Put(dstconn)
-	bu, err := srcconn.BackupInit(DBNAME, BACKUP2, dstconn)
-	if err != nil {
-		log.Print("Way two, failure 1 (BackupInit)")
-		log.Fatal(err)
-	}
-	if err := bu.Step(-1); err != nil {
-		log.Print("Way two, failure 2 (Step)")
-		log.Fatal(err)
-	}
-	if err := bu.Finish(); err != nil {
-		log.Print("Way two, failure 3 (Finish)")
-		log.Fatal(err)
-	}
+	// dstpool, err := sqlitex.Open(BACKUP2, 0, 10)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer dstpool.Close()
+	// dstconn := dstpool.Get(nil)
+	// defer dstpool.Put(dstconn)
+	// bu, err := srcconn.BackupInit(DBNAME, BACKUP2, dstconn)
+	// if err != nil {
+	// 	log.Print("Way two, failure 1 (BackupInit)")
+	// 	log.Fatal(err)
+	// }
+	// if err := bu.Step(-1); err != nil {
+	// 	log.Print("Way two, failure 2 (Step)")
+	// 	log.Fatal(err)
+	// }
+	// if err := bu.Finish(); err != nil {
+	// 	log.Print("Way two, failure 3 (Finish)")
+	// 	log.Fatal(err)
+	// }
 
 	// Post-backup, insert another product into non-backup DB.
 	insertProduct(srcconn, "OR", "Orange T")
 
 	fmt.Println("src products count (should be 3):", selectCountStar(srcconn, "products"))
-	fmt.Println("dst products count (should be 2):", selectCountStar(dstconn, "products"))
+	// fmt.Println("dst products count (should be 2):", selectCountStar(dstconn, "products"))
 	// don't have a convenient conn to check backup2.db...
 }
 
